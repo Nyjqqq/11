@@ -1,0 +1,1808 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HPLC 预测工具 - 化学编辑器</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .tabs { display: flex; background: #f8f9fa; border-bottom: 2px solid #dee2e6; }
+        .tab-btn {
+            flex: 1; padding: 15px 20px; border: none; background: transparent;
+            cursor: pointer; font-size: 15px; font-weight: 500; color: #555;
+            transition: all 0.3s; border-bottom: 3px solid transparent;
+        }
+        .tab-btn:hover { background: #e9ecef; }
+        .tab-btn.active { color: #667eea; border-bottom-color: #667eea; background: white; }
+        .tab-content { display: none; padding: 30px; }
+        .tab-content.active { display: block; }
+        .section {
+            margin-bottom: 30px; padding: 20px;
+            background: #f8f9fa; border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        .section h2 { color: #333; font-size: 18px; margin-bottom: 15px; }
+        .form-row {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px; margin-bottom: 15px;
+        }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { font-size: 13px; color: #555; margin-bottom: 5px; font-weight: 500; }
+        .form-group input, .form-group select {
+            padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;
+        }
+        .form-group input:focus { outline: none; border-color: #667eea; }
+        .btn {
+            padding: 12px 25px; border: none; border-radius: 5px;
+            cursor: pointer; font-size: 14px; font-weight: 500;
+            margin-right: 10px; margin-bottom: 10px;
+        }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-info { background: #17a2b8; color: white; }
+        .btn-danger { background: #dc3545; color: white; padding: 5px 10px; font-size: 12px; }
+        
+        /* 工具栏 */
+        .toolbar {
+            display: flex; flex-wrap: wrap; gap: 8px; margin: 15px 0;
+            padding: 15px; background: #e9ecef; border-radius: 8px;
+        }
+        .tool-btn {
+            width: 45px; height: 45px;
+            border: 2px solid #ced4da; background: white;
+            border-radius: 5px; cursor: pointer;
+            font-size: 20px; display: flex;
+            align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .tool-btn:hover { background: #e3f2fd; border-color: #2196f3; }
+        .tool-btn.active { background: #2196f3; color: white; border-color: #1976d2; }
+        
+        /* 画布区域 */
+        .canvas-container {
+            display: grid;
+            grid-template-columns: 250px 1fr 280px;
+            gap: 15px;
+            margin: 15px 0;
+        }
+        
+        /* 左侧官能团 */
+        .frag-panel {
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .frag-panel h4 {
+            font-size: 14px;
+            color: #667eea;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        .frag-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+        .frag-btn {
+            padding: 8px 5px;
+            font-size: 13px;
+            font-family: monospace;
+            border: 1px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .frag-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        /* 中间画布 */
+        .canvas-area {
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+        #structure_canvas {
+            cursor: crosshair;
+            background: 
+                linear-gradient(#f5f5f5 1px, transparent 1px),
+                linear-gradient(90deg, #f5f5f5 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        /* 黑色十字指针 - 使用 SVG data URI */
+        .canvas-area, #structure_canvas {
+            cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M16 2v28M2 16h28' stroke='black' stroke-width='2' fill='none'/%3E%3C/svg%3E") 16 16, crosshair !important;
+        }
+        
+        /* 右侧信息面板 */
+        .info-panel {
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            padding: 15px;
+        }
+        .info-box {
+            background: #e8f5e9;
+            border: 1px solid #4caf50;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .info-box h4 {
+            color: #2e7d32;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid #c8e6c9;
+        }
+        .info-row:last-child { border-bottom: none; }
+        .info-label { color: #555; font-size: 13px; }
+        .info-value { color: #2e7d32; font-weight: bold; font-size: 14px; }
+        
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        table th, table td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+        table th { background: #667eea; color: white; }
+        .chart-container {
+            position: relative; height: 400px; margin: 20px 0;
+            background: white; padding: 20px; border-radius: 10px;
+        }
+        .result-box {
+            background: white; border: 2px solid #667eea;
+            border-radius: 10px; padding: 20px; margin-top: 20px;
+        }
+        .result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+        .info-item { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; }
+        .info-item .value { font-size: 24px; font-weight: bold; color: #667eea; }
+        .info-item .label { font-size: 13px; color: #666; margin-top: 5px; }
+        .hidden { display: none; }
+        
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+            padding: 10px;
+            background: #fff3cd;
+            border-radius: 5px;
+            border-left: 3px solid #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔬 HPLC 预测工具 - 化学编辑器</h1>
+            <p>连接官能团 | 固定键长 | 完全离线</p>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('tab1', this)">🎨 画结构</button>
+            <button class="tab-btn" onclick="switchTab('tab2', this)">📊 保留预测</button>
+            <button class="tab-btn" onclick="switchTab('tab3', this)">📈 logD 曲线</button>
+            <button class="tab-btn" onclick="switchTab('tab4', this)">⚗️ 分离度</button>
+        </div>
+        
+        <!-- 标签页 1：画结构 -->
+        <div id="tab1" class="tab-content active">
+            <div class="section">
+                <h2>🎨 化学结构编辑器</h2>
+                
+                <!-- 工具栏 -->
+                <div class="toolbar">
+                    <button class="tool-btn active" onclick="setTool('select')" title="选择/移动">👆</button>
+                    <button class="tool-btn" onclick="setTool('bond_single')" title="单键" id="btn_bond_single">─</button>
+                    <button class="tool-btn" onclick="setTool('bond_double')" title="双键" id="btn_bond_double">═</button>
+                    <button class="tool-btn" onclick="setTool('bond_triple')" title="三键" id="btn_bond_triple">≡</button>
+                    <span style="width: 15px;"></span>
+                    <button class="tool-btn" onclick="setTool('C')" title="碳原子" id="btn_C">C</button>
+                    <button class="tool-btn" onclick="setTool('N')" title="氮原子" id="btn_N">N</button>
+                    <button class="tool-btn" onclick="setTool('O')" title="氧原子" id="btn_O">O</button>
+                    <button class="tool-btn" onclick="setTool('S')" title="硫原子" id="btn_S">S</button>
+                    <button class="tool-btn" onclick="setTool('P')" title="磷原子" id="btn_P">P</button>
+                    <button class="tool-btn" onclick="setTool('F')" title="氟" id="btn_F">F</button>
+                    <button class="tool-btn" onclick="setTool('Cl')" title="氯" id="btn_Cl">Cl</button>
+                    <button class="tool-btn" onclick="setTool('Br')" title="溴" id="btn_Br">Br</button>
+                    <span style="width: 15px;"></span>
+                    <button class="tool-btn" onclick="setTool('ring6')" title="六元环" id="btn_ring6">⬡</button>
+                    <button class="tool-btn" onclick="setTool('ring_benzene')" title="苯环" id="btn_ring_benzene">⏣</button>
+                    <span style="width: 15px;"></span>
+                    <button class="tool-btn" onclick="deleteSelected()" title="删除选中">🗑️</button>
+                    <button class="tool-btn" onclick="clearCanvas()" title="清空">❌</button>
+                    <button class="tool-btn" onclick="undo()" title="撤销">↶</button>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; margin: 10px 0; padding: 8px 15px; background: #e3f2fd; border-radius: 8px; border-left: 4px solid #2196f3;">
+                    <span style="font-size: 13px; color: #1565c0;">
+                        <strong>当前模式：</strong>
+                        <span id="status_text">选择工具</span>
+                        <span id="bond_type_indicator" style="display: none; margin-left: 10px; padding: 2px 8px; background: #2196f3; color: white; border-radius: 4px; font-size: 12px;">单键</span>
+                    </span>
+                    <span style="font-size: 12px; color: #666;">选中原子：<strong id="selected_count">0</strong> 个</span>
+                </div>
+                
+                <div class="help-text">
+                    <strong>💡 使用方法：</strong><br>
+                    1. <strong>添加原子</strong> → 空白处左键点击添加原子<br>
+                    2. <strong>延伸碳链</strong> → 左键点击已有原子→移动鼠标确定方向→再次点击确认（固定键长）<br>
+                    3. <strong>替换原子</strong> → 选择 N/O/S 等，<strong>右键点击</strong>已有原子替换<br>
+                    4. <strong>切换键类型</strong> → 点击化学键（任何工具下都可）单→双→三循环切换<br>
+                    5. <strong>选择工具（👆）</strong> → 拖动原子移动位置<br>
+                    6. <strong>显示规则</strong> → 只显示末端基团和杂原子，链上碳不显示，文字自动避开化学键
+                </div>
+                
+                <!-- 画布区域 -->
+                <div class="canvas-container">
+                    <!-- 左侧官能团 -->
+                    <div class="frag-panel">
+                        <h4>🧩 官能团（点击添加到选中的原子）</h4>
+                        <div class="frag-grid">
+                            <button class="frag-btn" onclick="addFragment('methyl')">-CH₃</button>
+                            <button class="frag-btn" onclick="addFragment('ethyl')">-C₂H₅</button>
+                            <button class="frag-btn" onclick="addFragment('vinyl')">-CH=CH₂</button>
+                            <button class="frag-btn" onclick="addFragment('hydroxy')">-OH</button>
+                            <button class="frag-btn" onclick="addFragment('aldehyde')">-CHO</button>
+                            <button class="frag-btn" onclick="addFragment('carboxyl')">-COOH</button>
+                            <button class="frag-btn" onclick="addFragment('ester')">-COOCH₃</button>
+                            <button class="frag-btn" onclick="addFragment('amino')">-NH₂</button>
+                            <button class="frag-btn" onclick="addFragment('cyano')">-CN</button>
+                            <button class="frag-btn" onclick="addFragment('chloro')">-Cl</button>
+                            <button class="frag-btn" onclick="addFragment('fluoro')">-F</button>
+                            <button class="frag-btn" onclick="addFragment('bromo')">-Br</button>
+                            <button class="frag-btn" onclick="addFragment('mercapto')">-SH</button>
+                            <button class="frag-btn" onclick="addFragment('amide')">-CONH₂</button>
+                            <button class="frag-btn" onclick="addFragment('methoxy')">-OCH₃</button>
+                            <button class="frag-btn" onclick="addFragment('phenyl')">苯环</button>
+                        </div>
+                        
+                        <h4 style="margin-top: 20px;">📥 快速加载</h4>
+                        <div class="frag-grid">
+                            <button class="frag-btn" onclick="loadExample('ibuprofen')">布洛芬</button>
+                            <button class="frag-btn" onclick="loadExample('propranolol')">普萘洛尔</button>
+                            <button class="frag-btn" onclick="loadExample('caffeine')">咖啡因</button>
+                            <button class="frag-btn" onclick="loadExample('aspirin')">阿司匹林</button>
+                        </div>
+                    </div>
+                    
+                    <!-- 中间画布 -->
+                    <div class="canvas-area">
+                        <canvas id="structure_canvas" width="600" height="500"></canvas>
+                    </div>
+                    
+                    <!-- 右侧信息 -->
+                    <div class="info-panel">
+                        <div class="info-box hidden" id="structure_result">
+                            <h4>📊 结构信息</h4>
+                            <div class="info-row">
+                                <span class="info-label">估算分子量</span>
+                                <span class="info-value" id="res_mw">--</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">预测 logP</span>
+                                <span class="info-value" id="res_logp">--</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">预测 pKa</span>
+                                <span class="info-value" id="res_pka">--</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">化合物类型</span>
+                                <span class="info-value" id="res_type">--</span>
+                            </div>
+                        </div>
+                        
+                        <button class="btn btn-primary" style="width: 100%;" onclick="analyzeStructure()">🔬 分析结构</button>
+                        <button class="btn btn-success" style="width: 100%; margin-top: 10px;" onclick="switchToPrediction()">✅ 使用此化合物预测</button>
+                        
+                        <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <h4 style="color: #667eea; margin-bottom: 10px;">💡 连接说明</h4>
+                            <ol style="font-size: 12px; color: #666; line-height: 1.8; padding-left: 20px;">
+                                <li>点击原子/键工具，在画布放置</li>
+                                <li>从一个原子拖动到另一个原子创建键</li>
+                                <li>点击左侧官能团，替换选中的原子</li>
+                                <li>使用选择工具移动原子位置</li>
+                                <li>点击"分析结构"计算 logP/pKa</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 标签页 2：保留预测 -->
+        <div id="tab2" class="tab-content">
+            <div class="section">
+                <h2>色谱条件</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>色谱柱</label>
+                        <select id="column" onchange="recalc()">
+                            <option value="aurashell_c18">Aurashell C18</option>
+                            <option value="wp_c18">WP C18</option>
+                            <option value="horizon_c18">Horizon C18</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>%B (%)</label>
+                        <input type="number" id="percent_b" value="40" oninput="recalc()">
+                    </div>
+                    <div class="form-group">
+                        <label>死时间 t₀ (min)</label>
+                        <input type="number" id="t0" value="1.2" step="0.1" oninput="recalc()">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>已知化合物（至少 3 个）</h2>
+                <table id="known_table">
+                    <thead>
+                        <tr><th>名称</th><th>tR (min)</th><th>logP</th><th>类型</th><th>操作</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><input type="text" class="cpd-name" placeholder="布洛芬" oninput="recalc()"></td>
+                            <td><input type="number" class="cpd-tr" step="0.1" oninput="recalc()"></td>
+                            <td><input type="number" class="cpd-logp" step="0.1" oninput="recalc()"></td>
+                            <td><select class="cpd-type" onchange="recalc()"><option value="acid">酸性</option><option value="base">碱性</option><option value="neutral">中性</option></select></td>
+                            <td><button class="btn btn-danger" onclick="removeRow()">删除</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+                <button class="btn btn-secondary" onclick="addRow()">+ 添加</button>
+                <button class="btn btn-secondary" onclick="loadExampleData()">📝 加载示例</button>
+            </div>
+            
+            <div class="section">
+                <h2>预测新化合物</h2>
+                <div class="form-row">
+                    <div class="form-group"><label>名称</label><input type="text" id="new_name"></div>
+                    <div class="form-group"><label>logP</label><input type="number" id="new_logp" step="0.1" oninput="recalc()"></div>
+                    <div class="form-group"><label>预测%B</label><input type="number" id="predict_b" value="40" oninput="recalc()"></div>
+                </div>
+                <button class="btn btn-primary" onclick="predict()">🔮 预测保留时间</button>
+            </div>
+            
+            <div id="result2" class="result-box hidden">
+                <h3>预测结果</h3>
+                <div class="result-grid">
+                    <div class="info-item"><div class="value" id="r_tr">--</div><div class="label">tR (min)</div></div>
+                    <div class="info-item"><div class="value" id="r_k">--</div><div class="label">k</div></div>
+                    <div class="info-item"><div class="value" id="r_logkw">--</div><div class="label">log kw</div></div>
+                    <div class="info-item"><div class="value" id="r_s">--</div><div class="label">S</div></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 标签页 3：logD 曲线 -->
+        <div id="tab3" class="tab-content">
+            <div class="section">
+                <h2>📈 logD-pH 曲线</h2>
+                <div class="form-row">
+                    <div class="form-group"><label>化合物名称</label><input type="text" id="logd_name" placeholder="布洛芬"></div>
+                    <div class="form-group"><label>logP</label><input type="number" id="logd_logp" step="0.1" placeholder="3.97"></div>
+                    <div class="form-group">
+                        <label>类型</label>
+                        <select id="logd_type" onchange="togglePkaInputs()">
+                            <option value="acid">酸性</option>
+                            <option value="base">碱性</option>
+                            <option value="zwitter">两性</option>
+                            <option value="multipka">多 pKa</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- 单 pKa 输入 -->
+                <div id="single_pka_input" class="form-row">
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label>pKa 值（用逗号分隔多个值，如：2.5, 7.2, 9.8）</label>
+                        <input type="text" id="logd_pka" placeholder="4.91 或 2.5, 7.2, 9.8">
+                    </div>
+                </div>
+                
+                <!-- 多 pKa 详细输入（可选） -->
+                <div id="multi_pka_inputs" class="form-row" style="display: none;">
+                    <div class="form-group"><label>pKa 1</label><input type="number" id="pka_1" step="0.1" placeholder="2.5"></div>
+                    <div class="form-group"><label>pKa 2</label><input type="number" id="pka_2" step="0.1" placeholder="7.2"></div>
+                    <div class="form-group"><label>pKa 3</label><input type="number" id="pka_3" step="0.1" placeholder="9.8"></div>
+                    <div class="form-group"><label>pKa 4</label><input type="number" id="pka_4" step="0.1" placeholder="12.0"></div>
+                </div>
+                
+                <button class="btn btn-primary" onclick="calcLogD()">📈 计算曲线</button>
+                
+                <div class="help-text" style="margin-top: 15px;">
+                    <strong>💡 提示：</strong>
+                    对于多 pKa 化合物（如氨基酸、多肽），输入所有可解离基团的 pKa 值。<br>
+                    例如：谷氨酸 pKa≈2.2, 4.3, 9.7；赖氨酸 pKa≈2.2, 9.0, 10.5<br>
+                    <strong style="color: #2e7d32;">✅ 公式说明：</strong>采用标准 Henderson-Hasselbalch 方程，与 ACD/Labs 算法一致。<br>
+                    酸性：logD = logP - log₁₀(1 + 10^(pH-pKa)) | 碱性：logD = logP - log₁₀(1 + 10^(pKa-pH))
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>logD-pH 曲线图</h2>
+                <div class="chart-container"><canvas id="logdChart"></canvas></div>
+            </div>
+            
+            <div class="section">
+                <h2>数据表</h2>
+                <table id="logd_table">
+                    <thead><tr><th>pH</th><th>logD</th><th>净电荷</th><th>推荐条件</th></tr></thead>
+                    <tbody id="logd_body"></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- 标签页 4：分离度 -->
+        <div id="tab4" class="tab-content">
+            <div class="section">
+                <h2>实验数据</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>实验次数</label>
+                        <select id="exp_count" onchange="updExp()">
+                            <option value="2">2 次</option>
+                            <option value="3" selected>3 次</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>t₀ (min)</label><input type="number" id="exp_t0" value="1.2"></div>
+                </div>
+                <table id="exp_table">
+                    <thead><tr><th>实验</th><th>%B</th><th>化合物 1 tR</th><th>化合物 2 tR</th></tr></thead>
+                    <tbody id="exp_body"></tbody>
+                </table>
+                <button class="btn btn-primary" onclick="calcSep()">⚗️ 优化</button>
+            </div>
+            
+            <div id="opt_result" class="result-box hidden">
+                <h3>最佳条件</h3>
+                <div class="result-grid">
+                    <div class="info-item"><div class="value" id="opt_b">--</div><div class="label">最佳%B</div></div>
+                    <div class="info-item"><div class="value" id="opt_rs">--</div><div class="label">最小 Rs</div></div>
+                    <div class="info-item"><div class="value" id="opt_time">--</div><div class="label">分析时间</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://unpkg.com/chart.js@3.9.1/dist/chart.min.js" defer></script>
+    <script>
+        // 化学结构编辑器核心
+        let canvas, ctx;
+        let atoms = [];  // {x, y, element, label, id}
+        let bonds = [];  // {from, to, type, id}
+        let selectedAtom = null;
+        let currentTool = 'C';  // 默认选择 C 原子工具
+        let currentBondType = 1;  // 当前键类型 (1=单，2=双，3=三)
+        let isDragging = false;
+        let dragStartAtom = null;
+        let dragToEmpty = false;  // 标记是否拖动到空白处
+        let pendingAtom = null;  // 待确认的原子（第一步点击后）
+        let pendingAngle = 0;  // 待确认的角度
+        let history = [];
+        const BOND_LENGTH = 50;  // 固定键长
+        
+        const DB = {
+            '布洛芬': {logP:3.97,pKa:4.91,type:'acid'},
+            '双氯芬酸': {logP:4.51,pKa:4.0,type:'acid'},
+            '普萘洛尔': {logP:3.48,pKa:9.45,type:'base'},
+            '咖啡因': {logP:-0.07,pKa:14,type:'neutral'},
+            '阿司匹林': {logP:1.19,pKa:3.5,type:'acid'},
+        };
+        
+        const EXAMPLES = {
+            'ibuprofen': {name:'布洛芬',logP:3.97,pKa:4.91,type:'acid',atoms:[{x:300,y:250,e:'C'},{x:350,y:250,e:'C'}]},
+            'propranolol': {name:'普萘洛尔',logP:3.48,pKa:9.45,type:'base'},
+            'caffeine': {name:'咖啡因',logP:-0.07,pKa:14,type:'neutral'},
+            'aspirin': {name:'阿司匹林',logP:1.19,pKa:3.5,type:'acid'}
+        };
+        
+        function switchTab(id, btnEl) {
+            document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            if (btnEl) {
+                btnEl.classList.add('active');
+            } else {
+                // 根据 tab id 找到对应的按钮
+                const tabMap = {'tab1': 0, 'tab2': 1, 'tab3': 2, 'tab4': 3};
+                const idx = tabMap[id];
+                if (idx !== undefined) {
+                    document.querySelectorAll('.tab-btn')[idx]?.classList.add('active');
+                }
+            }
+        }
+        
+        function initCanvas() {
+            console.log('=== 开始初始化画布 ===');
+            
+            canvas = document.getElementById('structure_canvas');
+            console.log('canvas 元素:', canvas);
+            
+            if (!canvas) {
+                console.error('❌ 找不到 canvas 元素！');
+                return;
+            }
+            
+            ctx = canvas.getContext('2d');
+            console.log('ctx 上下文:', ctx);
+            
+            if (!ctx) {
+                console.error('❌ 无法获取 canvas 上下文！');
+                return;
+            }
+            
+            // 默认选中 C 原子工具
+            currentTool = 'C';
+            console.log('设置 currentTool =', currentTool);
+            
+            // 手动设置 C 按钮高亮并更新状态
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('btn_C')?.classList.add('active');
+            console.log('C 按钮高亮:', document.getElementById('btn_C')?.classList.contains('active'));
+            
+            updateStatus();
+            console.log('状态栏文字:', document.getElementById('status_text')?.textContent);
+            
+            // 添加事件监听器
+            canvas.addEventListener('mousedown', handleMouseDown);
+            canvas.addEventListener('mousemove', handleMouseMove);
+            canvas.addEventListener('mouseup', handleMouseUp);
+            canvas.addEventListener('mouseout', handleMouseUp);
+            bindContextMenu();  // 绑定右键菜单
+            console.log('事件监听器已添加');
+            
+            // 初始绘制（不通过 clearCanvas，避免循环调用）
+            atoms = [];
+            bonds = [];
+            selectedAtom = null;
+            history = [];
+            redraw();
+            
+            console.log('=== 初始化完成 ===');
+        }
+        
+        function setTool(tool) {
+            console.log('=== setTool 调用 ===');
+            console.log('切换工具:', tool);
+            
+            // 如果正在等待确认方向，切换到其他工具时取消延伸
+            if (pendingAtom) {
+                pendingAtom = null;
+                pendingAngle = 0;
+            }
+            
+            currentTool = tool;
+            console.log('设置 currentTool =', currentTool);
+            
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            
+            // 处理键类型选择
+            if (tool === 'bond_single') {
+                currentBondType = 1;
+                document.getElementById('btn_bond_single')?.classList.add('active');
+            } else if (tool === 'bond_double') {
+                currentBondType = 2;
+                document.getElementById('btn_bond_double')?.classList.add('active');
+            } else if (tool === 'bond_triple') {
+                currentBondType = 3;
+                document.getElementById('btn_bond_triple')?.classList.add('active');
+            } else {
+                // 其他工具
+                const btnId = 'btn_' + tool;
+                const btn = document.getElementById(btnId);
+                console.log('查找按钮:', btnId, '存在:', !!btn);
+                btn?.classList.add('active');
+                console.log('按钮高亮:', btn?.classList.contains('active'));
+            }
+            
+            // 只有在 ctx 存在时才调用 redraw
+            if (ctx && canvas) {
+                redraw();
+            }
+            console.log('=== setTool 完成 ===');
+        }
+        
+        // 右键点击替换原子（在 initCanvas 中绑定，避免 canvas 未初始化）
+        function bindContextMenu() {
+            if (!canvas) return;
+            canvas.addEventListener('contextmenu', function(e) {
+                e.preventDefault();
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                // 查找点击的原子（检测范围 35px）
+                const clickedAtom = atoms.find(a => {
+                    const dx = a.x - x;
+                    const dy = a.y - y;
+                    return Math.sqrt(dx*dx + dy*dy) < 35;
+                });
+                
+                if (clickedAtom && ['C','N','O','S','P','F','Cl','Br'].includes(currentTool)) {
+                    // 替换原子元素
+                    clickedAtom.element = currentTool;
+                    clickedAtom.label = currentTool;
+                    saveHistory();
+                    redraw();
+                }
+            });
+        }
+        
+        function clearCanvas() {
+            console.log('=== clearCanvas 调用 ===');
+            atoms = [];
+            bonds = [];
+            selectedAtom = null;
+            pendingAtom = null;
+            saveHistory();
+            if (ctx && canvas) {
+                redraw();
+            }
+            document.getElementById('structure_result')?.classList.add('hidden');
+            console.log('=== clearCanvas 完成 ===');
+        }
+        
+        function saveHistory() {
+            history.push({
+                atoms: JSON.parse(JSON.stringify(atoms)),
+                bonds: JSON.parse(JSON.stringify(bonds))
+            });
+            if (history.length > 20) history.shift();
+        }
+        
+        function undo() {
+            if (history.length > 1) {
+                history.pop();
+                const prev = history[history.length - 1];
+                atoms = JSON.parse(JSON.stringify(prev.atoms));
+                bonds = JSON.parse(JSON.stringify(prev.bonds));
+                redraw();
+            }
+        }
+        
+        // 计算原子的氢原子数（根据价键规则）
+        function getHydrogenCount(atom) {
+            // 如果已经有自定义标签（如官能团），直接返回
+            if (atom.label && atom.label !== atom.element) {
+                return null;
+            }
+            
+            // 计算该原子的总键级（单键=1，双键=2，三键=3）
+            let bondOrder = 0;
+            bonds.forEach(bond => {
+                if (bond.from === atom.id || bond.to === atom.id) {
+                    bondOrder += bond.type;
+                }
+            });
+            
+            // 根据元素类型计算氢原子数
+            const maxValence = {
+                'C': 4, 'N': 3, 'O': 2, 'S': 2, 'P': 3,
+                'F': 1, 'Cl': 1, 'Br': 1, 'I': 1
+            };
+            const valence = maxValence[atom.element] || 4;
+            const hCount = valence - bondOrder;
+            
+            if (hCount <= 0) return null;
+            if (hCount === 1) return 'H';
+            if (hCount === 2) return 'H₂';
+            if (hCount === 3) return 'H₃';
+            if (hCount === 4) return 'H₄';
+            return null;
+        }
+        
+        // 判断原子是否是末端原子（只连接一个键）
+        function isTerminalAtom(atom) {
+            const bondCount = bonds.filter(b => b.from === atom.id || b.to === atom.id).length;
+            return bondCount <= 1;
+        }
+        
+        // 检查原子是否超过最大价键数
+        function isValenceExceeded(atom) {
+            const maxValence = {
+                'C': 4, 'N': 3, 'O': 2, 'S': 6, 'P': 5,
+                'F': 1, 'Cl': 1, 'Br': 1, 'I': 1
+            };
+            const maxBondOrder = maxValence[atom.element] || 4;
+            
+            // 计算该原子的总键级（单键=1，双键=2，三键=3）
+            let bondOrder = 0;
+            bonds.forEach(bond => {
+                if (bond.from === atom.id || bond.to === atom.id) {
+                    bondOrder += bond.type;
+                }
+            });
+            
+            return bondOrder > maxBondOrder;
+        }
+        
+        // 获取原子的显示标签
+        function getAtomLabel(atom) {
+            // 如果有自定义标签（官能团，且不是单个元素符号），直接返回
+            if (atom.label && atom.label.length > 2) {
+                return atom.label;
+            }
+            
+            // 杂原子（N/O/S/P/F/Cl/Br）始终显示
+            if (atom.element !== 'C') {
+                const hStr = getHydrogenCount(atom);
+                
+                // 末端杂原子显示元素和氢
+                if (hStr) {
+                    return atom.element + hStr;
+                }
+                return atom.element;
+            }
+            
+            // 碳原子：末端碳显示，链上碳通常不显示
+            // 但如果价键超限，链上碳也要显示（标红提醒）
+            if (isTerminalAtom(atom)) {
+                const hStr = getHydrogenCount(atom);
+                if (hStr) {
+                    return 'C' + hStr;
+                }
+                return 'C';
+            }
+            
+            // 链上碳：如果价键超限，显示 C 提醒
+            if (isValenceExceeded(atom)) {
+                return 'C';
+            }
+            
+            // 正常链上碳不显示
+            return '';
+        }
+        
+        function redraw() {
+            console.log('=== redraw 调用 ===');
+            
+            if (!ctx) {
+                console.error('❌ redraw: ctx 不存在');
+                return;
+            }
+            if (!canvas) {
+                console.error('❌ redraw: canvas 不存在');
+                return;
+            }
+            
+            console.log('atoms:', atoms.length, 'bonds:', bonds.length);
+            console.log('selectedAtom:', selectedAtom);
+            console.log('currentTool:', currentTool);
+            
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 更新状态显示
+            updateStatus();
+            
+            // 绘制键（杂原子处缩短，留出显示空间；单双三键用平行线表示）
+            bonds.forEach(bond => {
+                const a1 = atoms.find(a => a.id === bond.from);
+                const a2 = atoms.find(a => a.id === bond.to);
+                if (a1 && a2) {
+                    // 计算键的方向和长度
+                    const dx = a2.x - a1.x;
+                    const dy = a2.y - a1.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const unitX = dx / dist;
+                    const unitY = dy / dist;
+                    
+                    // 垂直于键方向的单位向量（用于绘制平行线）
+                    const perpX = -unitY;
+                    const perpY = unitX;
+                    
+                    // 杂原子需要留出显示空间（缩短 12px）
+                    // 碳原子不显示标签，不需要缩短
+                    const offset1 = (a1.element !== 'C') ? 12 : 0;
+                    const offset2 = (a2.element !== 'C') ? 12 : 0;
+                    
+                    // 计算缩短后的起点和终点
+                    const startX = a1.x + unitX * offset1;
+                    const startY = a1.y + unitY * offset1;
+                    const endX = a2.x - unitX * offset2;
+                    const endY = a2.y - unitY * offset2;
+                    
+                    ctx.strokeStyle = '#333';
+                    ctx.lineWidth = 2;
+                    
+                    if (bond.type === 1) {
+                        // 单键：一条线
+                        ctx.beginPath();
+                        ctx.moveTo(startX, startY);
+                        ctx.lineTo(endX, endY);
+                        ctx.stroke();
+                    } else if (bond.type === 2) {
+                        // 双键：两条平行线，间距 4px
+                        const gap = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(startX + perpX * gap, startY + perpY * gap);
+                        ctx.lineTo(endX + perpX * gap, endY + perpY * gap);
+                        ctx.moveTo(startX - perpX * gap, startY - perpY * gap);
+                        ctx.lineTo(endX - perpX * gap, endY - perpY * gap);
+                        ctx.stroke();
+                    } else if (bond.type === 3) {
+                        // 三键：三条平行线，间距 3px
+                        const gap = 3;
+                        ctx.beginPath();
+                        ctx.moveTo(startX + perpX * gap, startY + perpY * gap);
+                        ctx.lineTo(endX + perpX * gap, endY + perpY * gap);
+                        ctx.moveTo(startX, startY);
+                        ctx.lineTo(endX, endY);
+                        ctx.moveTo(startX - perpX * gap, startY - perpY * gap);
+                        ctx.lineTo(endX - perpX * gap, endY - perpY * gap);
+                        ctx.stroke();
+                    }
+                }
+            });
+            
+            // 绘制原子
+            atoms.forEach(atom => {
+                const displayLabel = getAtomLabel(atom);
+                console.log('原子:', { id: atom.id, x: atom.x, y: atom.y, element: atom.element, displayLabel });
+                
+                // 绘制原子标签文字
+                if (displayLabel) {
+                    console.log('绘制文字:', displayLabel, '位置:', { x: atom.x, y: atom.y });
+                    // 计算原子的键方向，偏移文字位置避免与键重叠
+                    let offsetX = 0;
+                    let offsetY = 0;
+                    const connectedBonds = bonds.filter(b => b.from === atom.id || b.to === atom.id);
+                    const bondCount = connectedBonds.length;
+                    
+                    // 杂原子（非碳）在主链上时不偏移，直接显示在键的连接点
+                    // 碳原子或末端原子才偏移
+                    const isHeteroAtom = atom.element !== 'C';
+                    const isTerminal = bondCount <= 1;
+                    
+                    if (connectedBonds.length > 0 && !(isHeteroAtom && !isTerminal)) {
+                        // 计算所有连接键的平均方向
+                        let sumX = 0, sumY = 0;
+                        connectedBonds.forEach(bond => {
+                            const other = atoms.find(a => a.id === (bond.from === atom.id ? bond.to : bond.from));
+                            if (other) {
+                                sumX += other.x - atom.x;
+                                sumY += other.y - atom.y;
+                            }
+                        });
+                        const len = Math.sqrt(sumX * sumX + sumY * sumY);
+                        if (len > 0) {
+                            // 文字偏移方向与键相反，距离 10px（末端官能团靠近键）
+                            const offsetDist = 10;
+                            offsetX = -(sumX / len) * offsetDist;
+                            offsetY = -(sumY / len) * offsetDist;
+                        }
+                    }
+                    
+                    // 检查价键是否超限，超限则标红
+                    const exceeded = isValenceExceeded(atom);
+                    ctx.fillStyle = exceeded ? '#d32f2f' : '#000';
+                    ctx.font = exceeded ? 'bold 12px Arial' : '12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(displayLabel, atom.x + offsetX, atom.y + offsetY);
+                } else {
+                    console.log('无显示标签');
+                }
+            });
+            console.log('=== redraw 完成 ===');
+        }
+        
+        function updateStatus() {
+            const statusEl = document.getElementById('status_text');
+            const bondIndicator = document.getElementById('bond_type_indicator');
+            const selectedCount = document.getElementById('selected_count');
+            
+            if (!statusEl || !bondIndicator || !selectedCount) return;
+            
+            // 更新选中原子数
+            selectedCount.textContent = selectedAtom ? '1' : '0';
+            
+            // 更新工具状态
+            const toolNames = {
+                'select': '选择工具',
+                'C': '碳原子', 'N': '氮原子', 'O': '氧原子', 'S': '硫原子',
+                'P': '磷原子', 'F': '氟原子', 'Cl': '氯原子', 'Br': '溴原子',
+                'ring6': '六元环', 'ring_benzene': '苯环'
+            };
+            
+            if (pendingAtom) {
+                statusEl.textContent = '等待确认方向（点击确定新原子位置）';
+                bondIndicator.style.display = 'inline';
+                bondIndicator.textContent = currentBondType === 1 ? '单键' : currentBondType === 2 ? '双键' : '三键';
+            } else if (['C','N','O','S','P','F','Cl','Br'].includes(currentTool)) {
+                if (pendingAtom) {
+                    statusEl.textContent = toolNames[currentTool] + '（移动鼠标确定方向，点击确认延伸 / 再次点击原原子取消）';
+                } else {
+                    statusEl.textContent = toolNames[currentTool] + '（点击原子进入延伸模式，右键点击替换，点击空白添加）';
+                }
+                bondIndicator.style.display = 'inline';
+                bondIndicator.textContent = currentBondType === 1 ? '单键' : currentBondType === 2 ? '双键' : '三键';
+            } else if (currentTool === 'select') {
+                statusEl.textContent = '选择/移动工具';
+                bondIndicator.style.display = 'none';
+            } else if (['bond_single', 'bond_double', 'bond_triple'].includes(currentTool)) {
+                statusEl.textContent = '创建键工具';
+                bondIndicator.style.display = 'inline';
+                bondIndicator.textContent = currentBondType === 1 ? '单键' : currentBondType === 2 ? '双键' : '三键';
+            } else if (currentTool === 'ring6') {
+                statusEl.textContent = '六元环工具';
+                bondIndicator.style.display = 'none';
+            } else if (currentTool === 'ring_benzene') {
+                statusEl.textContent = '苯环工具';
+                bondIndicator.style.display = 'none';
+            }
+        }
+        
+        function handleMouseDown(e) {
+            console.log('=== 鼠标点击 ===');
+            console.log('当前 tool:', currentTool);
+            console.log('atoms 数量:', atoms.length);
+            console.log('点击坐标:', { clientX: e.clientX, clientY: e.clientY });
+            console.log('鼠标按钮:', e.button, '(0=左键，1=中键，2=右键)');
+            
+            // 右键点击交给 contextmenu 事件处理，这里不处理
+            if (e.button === 2) {
+                console.log('右键点击，跳过左键处理');
+                return;
+            }
+            
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+            
+            console.log('canvas 坐标:', { x, y });
+            console.log('atoms 位置:', atoms.map(a => ({ id: a.id, x: a.x, y: a.y, element: a.element })));
+            
+            // 查找点击的原子（检测范围 35px）
+            const clickedAtom = atoms.find(a => {
+                const dx = a.x - x;
+                const dy = a.y - y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < 35) {
+                    console.log('✓ 找到原子!', { id: a.id, element: a.element, distance: dist });
+                    return true;
+                }
+                return false;
+            });
+            
+            console.log('clickedAtom:', clickedAtom ? { id: clickedAtom.id, element: clickedAtom.element } : null);
+            
+            // 查找点击的键（检测范围：键中心 2/3 区域）
+            // 键检测独立于原子检测，任何模式下都可以点击键切换类型
+            let clickedBond = null;
+            clickedBond = bonds.find(b => {
+                const a1 = atoms.find(a => a.id === b.from);
+                const a2 = atoms.find(a => a.id === b.to);
+                if (!a1 || !a2) return false;
+                
+                // 计算键长和中心点
+                const bondDx = a2.x - a1.x;
+                const bondDy = a2.y - a1.y;
+                const bondLen = Math.sqrt(bondDx * bondDx + bondDy * bondDy);
+                const centerX = a1.x + bondDx / 2;
+                const centerY = a1.y + bondDy / 2;
+                
+                // 计算点到线段的最短距离
+                const dist = pointToSegmentDistance(x, y, a1.x, a1.y, a2.x, a2.y);
+                
+                // 计算点到键中心的距离（沿键方向）
+                // 只检测键中心 1/3 到 2/3 之间的区域（即中间 1/3 段）
+                const unitX = bondDx / bondLen;
+                const unitY = bondDy / bondLen;
+                const projX = x - a1.x;
+                const projY = y - a1.y;
+                const projLen = projX * unitX + projY * unitY;
+                
+                // 检测区域：键长的 1/3 到 2/3 处（中心区域）
+                const minLen = bondLen * 0.33;
+                const maxLen = bondLen * 0.67;
+                
+                // 点击位置必须在键的中心区域，且距离键足够近
+                return dist < 20 && projLen >= minLen && projLen <= maxLen;
+            });
+            
+            console.log('clickedBond:', clickedBond ? { type: clickedBond.type } : null);
+            
+            // 如果有待确认的原子（第二步：确定方向）
+            if (pendingAtom) {
+                // 计算新原子位置（固定键长）
+                const dx = x - pendingAtom.x;
+                const dy = y - pendingAtom.y;
+                const angle = Math.atan2(dy, dx);
+                const newX = pendingAtom.x + BOND_LENGTH * Math.cos(angle);
+                const newY = pendingAtom.y + BOND_LENGTH * Math.sin(angle);
+                
+                // 创建新原子
+                const newAtom = {
+                    id: Date.now(),
+                    x: newX,
+                    y: newY,
+                    element: 'C',
+                    label: 'C'
+                };
+                atoms.push(newAtom);
+                
+                // 创建键
+                bonds.push({
+                    from: pendingAtom.id,
+                    to: newAtom.id,
+                    type: currentBondType
+                });
+                
+                // 清除待确认状态
+                pendingAtom = null;
+                pendingAngle = 0;
+                saveHistory();
+                redraw();
+                return;
+            }
+            
+            // 选择工具下的操作
+            if (currentTool === 'select') {
+                // 如果点击了键，切换键类型
+                if (clickedBond) {
+                    clickedBond.type = (clickedBond.type % 3) + 1;
+                    saveHistory();
+                    redraw();
+                    return;
+                }
+                
+                // 点击原子：选中，准备拖动
+                if (clickedAtom) {
+                    selectedAtom = clickedAtom.id;
+                    isDragging = true;
+                    dragStartAtom = clickedAtom;
+                    redraw();
+                    return;
+                }
+                
+                // 点击空白：取消选中
+                selectedAtom = null;
+                redraw();
+                return;
+            }
+            
+            // 原子工具（包括默认 C）
+            if (['C','N','O','S','P','F','Cl','Br'].includes(currentTool)) {
+                console.log('进入原子工具逻辑');
+                
+                // 如果点击了键，切换键类型（方便修改）
+                if (clickedBond) {
+                    clickedBond.type = (clickedBond.type % 3) + 1;
+                    saveHistory();
+                    redraw();
+                    return;
+                }
+                
+                if (clickedAtom) {
+                    console.log('点击了已有原子');
+                    
+                    // 如果点击的是待确认的原子本身，取消延伸
+                    if (pendingAtom && pendingAtom.id === clickedAtom.id) {
+                        console.log('取消延伸模式');
+                        pendingAtom = null;
+                        pendingAngle = 0;
+                        redraw();
+                        return;
+                    }
+                    
+                    // 如果已经有待确认原子，点击另一个原子则从待确认原子延伸
+                    if (pendingAtom && pendingAtom.id !== clickedAtom.id) {
+                        console.log('从待确认原子延伸到新原子');
+                        // 计算新原子位置（固定键长，从 pendingAtom 到 clickedAtom 的方向）
+                        const dx = clickedAtom.x - pendingAtom.x;
+                        const dy = clickedAtom.y - pendingAtom.y;
+                        const angle = Math.atan2(dy, dx);
+                        const newX = pendingAtom.x + BOND_LENGTH * Math.cos(angle);
+                        const newY = pendingAtom.y + BOND_LENGTH * Math.sin(angle);
+                        
+                        // 创建新原子
+                        const newAtom = {
+                            id: Date.now(),
+                            x: newX,
+                            y: newY,
+                            element: 'C',
+                            label: 'C'
+                        };
+                        atoms.push(newAtom);
+                        
+                        // 创建键
+                        bonds.push({
+                            from: pendingAtom.id,
+                            to: newAtom.id,
+                            type: currentBondType
+                        });
+                        
+                        // 清除待确认状态
+                        pendingAtom = null;
+                        pendingAngle = 0;
+                        saveHistory();
+                        redraw();
+                        return;
+                    }
+                    
+                    // 之前没有待确认原子，进入延伸模式
+                    console.log('进入延伸模式，待确认原子:', clickedAtom.id);
+                    pendingAtom = clickedAtom;
+                    pendingAngle = 0;
+                    redraw();
+                    return;
+                } else {
+                    console.log('点击了空白处');
+                    // 有待确认原子时，点击空白处确认延伸
+                    if (pendingAtom) {
+                        console.log('确认延伸，创建新原子');
+                        // 计算新原子位置（固定键长，从鼠标方向）
+                        const dx = x - pendingAtom.x;
+                        const dy = y - pendingAtom.y;
+                        const angle = Math.atan2(dy, dx);
+                        const newX = pendingAtom.x + BOND_LENGTH * Math.cos(angle);
+                        const newY = pendingAtom.y + BOND_LENGTH * Math.sin(angle);
+                        
+                        // 创建新原子
+                        const newAtom = {
+                            id: Date.now(),
+                            x: newX,
+                            y: newY,
+                            element: 'C',
+                            label: 'C'
+                        };
+                        atoms.push(newAtom);
+                        console.log('新原子:', newAtom);
+                        
+                        // 创建键
+                        bonds.push({
+                            from: pendingAtom.id,
+                            to: newAtom.id,
+                            type: currentBondType
+                        });
+                        
+                        // 清除待确认状态
+                        pendingAtom = null;
+                        pendingAngle = 0;
+                        saveHistory();
+                        redraw();
+                        return;
+                    }
+                    
+                    // 没有待确认原子，点击空白：直接添加新原子
+                    console.log('直接添加新原子');
+                    const newAtom = {
+                        id: Date.now(),
+                        x: x,
+                        y: y,
+                        element: currentTool,
+                        label: currentTool
+                    };
+                    atoms.push(newAtom);
+                    console.log('新原子:', newAtom);
+                    saveHistory();
+                    redraw();
+                    return;
+                }
+            } else {
+                console.log('当前不是原子工具，tool =', currentTool);
+            }
+            
+            // 环工具
+            if (currentTool === 'ring6') {
+                drawRing(x, y, 6);
+            } else if (currentTool === 'ring_benzene') {
+                drawBenzene(x, y);
+            }
+            
+            redraw();
+        }
+        
+        function handleMouseMove(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+            
+            // 有待确认原子时（第一步已点击，等待第二步确认方向）
+            if (pendingAtom && ['C','N','O','S','P','F','Cl','Br'].includes(currentTool)) {
+                redraw();
+                
+                // 计算新原子位置（固定键长）
+                const dx = x - pendingAtom.x;
+                const dy = y - pendingAtom.y;
+                const angle = Math.atan2(dy, dx);
+                const newX = pendingAtom.x + BOND_LENGTH * Math.cos(angle);
+                const newY = pendingAtom.y + BOND_LENGTH * Math.sin(angle);
+                
+                // 绘制预览键
+                ctx.beginPath();
+                ctx.moveTo(pendingAtom.x, pendingAtom.y);
+                ctx.lineTo(newX, newY);
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                // 绘制预览原子
+                ctx.beginPath();
+                ctx.arc(newX, newY, 20, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(51, 51, 51, 0.3)';
+                ctx.fill();
+                ctx.fillStyle = '#333';
+                ctx.font = 'bold 16px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('C', newX, newY);
+                
+                return;
+            }
+            
+            // 拖动模式
+            if (!isDragging || !dragStartAtom || currentTool !== 'select') return;
+            
+            // 拖动时显示预览键
+            redraw();
+            const atom = atoms.find(a => a.id === dragStartAtom.id);
+            if (atom) {
+                ctx.beginPath();
+                ctx.moveTo(atom.x, atom.y);
+                ctx.lineTo(x, y);
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+        
+        function handleMouseUp(e) {
+            if (isDragging && dragStartAtom && currentTool === 'select') {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                // 查找释放位置的原子（扩大检测范围）
+                const targetAtom = atoms.find(a => {
+                    const dx = a.x - x;
+                    const dy = a.y - y;
+                    return Math.sqrt(dx*dx + dy*dy) < 30 && a.id !== dragStartAtom.id;
+                });
+                
+                if (targetAtom) {
+                    // 拖动到另一个原子：创建键
+                    const existingBond = bonds.find(b => 
+                        (b.from === dragStartAtom.id && b.to === targetAtom.id) ||
+                        (b.from === targetAtom.id && b.to === dragStartAtom.id)
+                    );
+                    
+                    if (!existingBond) {
+                        bonds.push({
+                            from: dragStartAtom.id,
+                            to: targetAtom.id,
+                            type: currentBondType
+                        });
+                        saveHistory();
+                    }
+                } else if (dragToEmpty) {
+                    // 拖动到空白处：创建新原子并连接
+                    const newAtom = {
+                        id: Date.now(),
+                        x: x,
+                        y: y,
+                        element: 'C',
+                        label: 'C'
+                    };
+                    atoms.push(newAtom);
+                    bonds.push({
+                        from: dragStartAtom.id,
+                        to: newAtom.id,
+                        type: currentBondType
+                    });
+                    saveHistory();
+                    // 选中新原子，方便继续连接
+                    selectedAtom = newAtom.id;
+                } else {
+                    // 移动原子到新位置
+                    dragStartAtom.x = x;
+                    dragStartAtom.y = y;
+                    saveHistory();
+                }
+            }
+            
+            isDragging = false;
+            dragStartAtom = null;
+            dragToEmpty = false;
+            redraw();
+        }
+        
+        // 计算点到线段的最短距离
+        function pointToSegmentDistance(px, py, x1, y1, x2, y2) {
+            const A = px - x1;
+            const B = py - y1;
+            const C = x2 - x1;
+            const D = y2 - y1;
+            
+            const dot = A * C + B * D;
+            const lenSq = C * C + D * D;
+            let param = -1;
+            
+            if (lenSq !== 0) param = dot / lenSq;
+            
+            let xx, yy;
+            
+            if (param < 0) {
+                xx = x1;
+                yy = y1;
+            } else if (param > 1) {
+                xx = x2;
+                yy = y2;
+            } else {
+                xx = x1 + param * C;
+                yy = y1 + param * D;
+            }
+            
+            const dx = px - xx;
+            const dy = py - yy;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+        
+        function drawRing(x, y, sides) {
+            const size = BOND_LENGTH;
+            const angleStep = (Math.PI * 2) / sides;
+            const ringAtoms = [];
+            
+            // 创建环原子
+            for (let i = 0; i < sides; i++) {
+                const angle = angleStep * i - Math.PI / 2;
+                const ax = x + size * Math.cos(angle);
+                const ay = y + size * Math.sin(angle);
+                const atom = {
+                    id: Date.now() + i,
+                    x: ax,
+                    y: ay,
+                    element: 'C',
+                    label: 'C'
+                };
+                atoms.push(atom);
+                ringAtoms.push(atom);
+            }
+            
+            // 创建环键
+            for (let i = 0; i < sides; i++) {
+                bonds.push({
+                    from: ringAtoms[i].id,
+                    to: ringAtoms[(i + 1) % sides].id,
+                    type: 1
+                });
+            }
+            
+            // 选中第一个原子，方便继续连接
+            selectedAtom = ringAtoms[0].id;
+            saveHistory();
+            redraw();
+        }
+        
+        function drawBenzene(x, y) {
+            drawRing(x, y, 6);
+            // 标记为芳香环（简化处理）
+        }
+        
+        function addFragment(fragType) {
+            if (!selectedAtom) {
+                alert('请先选择一个原子（点击原子选中）');
+                return;
+            }
+            
+            const atom = atoms.find(a => a.id === selectedAtom);
+            if (!atom) return;
+            
+            // 替换原子标签（设置自定义标签后，不再自动计算氢原子）
+            const fragments = {
+                'methyl': 'CH₃',
+                'ethyl': 'C₂H₅',
+                'vinyl': 'CH=CH₂',
+                'hydroxy': 'OH',
+                'aldehyde': 'CHO',
+                'carboxyl': 'COOH',
+                'ester': 'COOCH₃',
+                'amino': 'NH₂',
+                'cyano': 'CN',
+                'chloro': 'Cl',
+                'fluoro': 'F',
+                'bromo': 'Br',
+                'mercapto': 'SH',
+                'amide': 'CONH₂',
+                'methoxy': 'OCH₃',
+                'phenyl': 'Ph'
+            };
+            
+            atom.label = fragments[fragType] || fragType;
+            atom.element = 'C'; // 保持元素类型用于计算
+            saveHistory();
+            redraw();
+        }
+        
+        function loadExample(name) {
+            const ex = EXAMPLES[name];
+            if (ex) {
+                clearCanvas();
+                ctx.fillStyle = '#2196f3';
+                ctx.font = 'bold 32px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(ex.name, canvas.width/2, canvas.height/2 - 20);
+                ctx.font = '16px Arial';
+                ctx.fillText(`logP=${ex.logP}, pKa=${ex.pKa}`, canvas.width/2, canvas.height/2 + 20);
+                
+                document.getElementById('structure_result').classList.remove('hidden');
+                document.getElementById('res_mw').textContent = '~' + (name.length * 20);
+                document.getElementById('res_logp').textContent = ex.logP.toFixed(2);
+                document.getElementById('res_pka').textContent = ex.pKa.toFixed(1);
+                document.getElementById('res_type').textContent = ex.type;
+            }
+        }
+        
+        function analyzeStructure() {
+            if (atoms.length === 0) {
+                alert('请先绘制结构或加载示例');
+                return;
+            }
+            
+            // 计算分子量（简化）
+            let mw = 0;
+            let hasAcid = false;
+            let hasBase = false;
+            let logP = 0;
+            
+            atoms.forEach(atom => {
+                const weights = {'C':12.01,'N':14.01,'O':16.00,'S':32.07,'P':30.97,'F':19.00,'Cl':35.45,'Br':79.90};
+                mw += weights[atom.element] || 12;
+                
+                if (atom.label === 'COOH' || atom.label === 'OH') hasAcid = true;
+                if (atom.label === 'NH₂' || atom.label === 'NH') hasBase = true;
+                if (atom.element === 'C') logP += 0.2;
+                if (atom.label === 'Ph' || atom.label === 'phenyl') logP += 1.0;
+                if (atom.label === 'Cl' || atom.label === 'Br') logP += 0.5;
+            });
+            
+            logP = Math.max(-2, Math.min(8, logP));
+            const pKa = hasAcid ? 4.5 : hasBase ? 9.5 : null;
+            const type = hasAcid ? 'acid' : hasBase ? 'base' : 'neutral';
+            
+            document.getElementById('structure_result').classList.remove('hidden');
+            document.getElementById('res_mw').textContent = mw.toFixed(0);
+            document.getElementById('res_logp').textContent = logP.toFixed(2);
+            document.getElementById('res_pka').textContent = pKa ? pKa.toFixed(1) : 'N/A';
+            document.getElementById('res_type').textContent = type;
+        }
+        
+        function switchToPrediction() {
+            const logp = document.getElementById('res_logp').textContent;
+            if (logp === '--') {
+                alert('请先分析结构');
+                return;
+            }
+            document.getElementById('new_logp').value = logp;
+            if (!document.getElementById('new_name').value) {
+                document.getElementById('new_name').value = '绘制的化合物';
+            }
+            switchTab('tab2');
+            setTimeout(predict, 200);
+        }
+        
+        function deleteSelected() {
+            if (selectedAtom) {
+                atoms = atoms.filter(a => a.id !== selectedAtom);
+                bonds = bonds.filter(b => b.from !== selectedAtom && b.to !== selectedAtom);
+                selectedAtom = null;
+                saveHistory();
+                redraw();
+            }
+        }
+        
+
+        
+        // 保留预测相关函数
+        function addRow() {
+            const tbody = document.querySelector('#known_table tbody');
+            const row = document.createElement('tr');
+            row.innerHTML = `<td><input type="text" class="cpd-name" oninput="recalc()"></td><td><input type="number" class="cpd-tr" step="0.1" oninput="recalc()"></td><td><input type="number" class="cpd-logp" step="0.1" oninput="recalc()"></td><td><select class="cpd-type" onchange="recalc()"><option value="acid">酸性</option><option value="base">碱性</option><option value="neutral">中性</option></select></td><td><button class="btn btn-danger" onclick="removeRow()">删除</button></td>`;
+            tbody.appendChild(row);
+        }
+        
+        function removeRow() {
+            const tbody = document.querySelector('#known_table tbody');
+            if (tbody.rows.length > 1) tbody.deleteRow(tbody.rows.length - 1);
+            else alert('至少保留一行');
+            recalc();
+        }
+        
+        function loadExampleData() {
+            const tbody = document.querySelector('#known_table tbody');
+            tbody.innerHTML = '';
+            const ex = [{n:'布洛芬',t:8.5,l:3.97},{n:'双氯芬酸',t:12.3,l:4.51},{n:'普萘洛尔',t:6.2,l:3.48},{n:'咖啡因',t:3.5,l:-0.07}];
+            ex.forEach(d => {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td><input type="text" class="cpd-name" value="${d.n}" oninput="recalc()"></td><td><input type="number" class="cpd-tr" value="${d.t}" step="0.1" oninput="recalc()"></td><td><input type="number" class="cpd-logp" value="${d.l}" step="0.1" oninput="recalc()"></td><td><select class="cpd-type" onchange="recalc()"><option value="acid">酸性</option><option value="base">碱性</option><option value="neutral">中性</option></select></td><td><button class="btn btn-danger" onclick="removeRow()">删除</button></td>`;
+                tbody.appendChild(row);
+            });
+            recalc();
+        }
+        
+        function calcModel() {
+            const rows = document.querySelectorAll('#known_table tbody tr');
+            const t0 = parseFloat(document.getElementById('t0').value);
+            const B = parseFloat(document.getElementById('percent_b').value) / 100;
+            const cpds = [];
+            rows.forEach(r => {
+                const tr = parseFloat(r.querySelector('.cpd-tr').value);
+                const logp = parseFloat(r.querySelector('.cpd-logp').value);
+                if (tr > 0 && t0 > 0) {
+                    const k = (tr - t0) / t0;
+                    cpds.push({k, logp});
+                }
+            });
+            if (cpds.length < 3) return null;
+            const avgLogK = cpds.reduce((s,c) => s + Math.log10(c.k), 0) / cpds.length;
+            const avgLogP = cpds.reduce((s,c) => s + (c.logp || 3), 0) / cpds.length;
+            const S = 4.5 + (avgLogP - 3) * 0.3;
+            const logKw = avgLogK + S * B;
+            return {logKw, S};
+        }
+        
+        function recalc() {
+            const m = calcModel();
+            if (m && !document.getElementById('result2').classList.contains('hidden')) {
+                predict();
+            }
+        }
+        
+        function predict() {
+            const m = calcModel();
+            if (!m) { alert('请输入至少 3 个已知化合物的数据'); return; }
+            const B = parseFloat(document.getElementById('predict_b').value) / 100;
+            const t0 = parseFloat(document.getElementById('t0').value);
+            const newLogP = parseFloat(document.getElementById('new_logp').value);
+            
+            const rows = document.querySelectorAll('#known_table tbody tr');
+            const knownLogPs = [];
+            rows.forEach(r => {
+                const logp = parseFloat(r.querySelector('.cpd-logp').value);
+                if (logp) knownLogPs.push(logp);
+            });
+            const avgKnownLogP = knownLogPs.reduce((a,b) => a+b, 0) / knownLogPs.length;
+            const logP_correction = (newLogP - avgKnownLogP) * 0.3;
+            
+            const logK = m.logKw - m.S * B + logP_correction;
+            const k = Math.pow(10, logK);
+            const tr = t0 * (1 + k);
+            
+            document.getElementById('result2').classList.remove('hidden');
+            document.getElementById('r_tr').textContent = tr.toFixed(2);
+            document.getElementById('r_k').textContent = k.toFixed(2);
+            document.getElementById('r_logkw').textContent = m.logKw.toFixed(2);
+            document.getElementById('r_s').textContent = m.S.toFixed(2);
+        }
+        
+        // 切换 pKa 输入模式
+        function togglePkaInputs() {
+            const type = document.getElementById('logd_type').value;
+            const singleInput = document.getElementById('single_pka_input');
+            const multiInputs = document.getElementById('multi_pka_inputs');
+            
+            if (type === 'multipka') {
+                singleInput.style.display = 'none';
+                multiInputs.style.display = 'grid';
+            } else {
+                singleInput.style.display = 'grid';
+                multiInputs.style.display = 'none';
+            }
+        }
+        
+        // 解析 pKa 值（支持多种输入方式）
+        function parsePkaValues() {
+            const type = document.getElementById('logd_type').value;
+            const pkaValues = [];
+            
+            if (type === 'multipka') {
+                // 从多个输入框获取
+                for (let i = 1; i <= 4; i++) {
+                    const val = parseFloat(document.getElementById('pka_' + i).value);
+                    if (val && val > 0) pkaValues.push(val);
+                }
+            } else {
+                // 从单个输入框获取（支持逗号分隔）
+                const pkaText = document.getElementById('logd_pka').value;
+                const parts = pkaText.split(/[,,\s]+/).filter(s => s.trim());
+                parts.forEach(p => {
+                    const val = parseFloat(p);
+                    if (val && val > 0) pkaValues.push(val);
+                });
+            }
+            
+            return pkaValues;
+        }
+        
+        // 计算多 pKa 化合物的 logD（标准 Henderson-Hasselbalch 方程）
+        function calcLogDMultiPka(pkaValues, logP, type, pH) {
+            let netCharge = 0;
+            
+            // 对于多 pKa 化合物，需要计算每个可解离基团的贡献
+            // logD = logP - log10(1 + Σ(离子化项))
+            
+            let ionizationSum = 0;
+            
+            pkaValues.forEach((pKa, idx) => {
+                if (type === 'acid' || type === 'multipka') {
+                    // 酸性基团：HA ⇌ H+ + A-
+                    // 离子化分数 = 10^(pH-pKa) / (1 + 10^(pH-pKa))
+                    const ratio = Math.pow(10, pH - pKa);
+                    ionizationSum += ratio;
+                    netCharge -= ratio / (1 + ratio); // 负电荷
+                } else if (type === 'base') {
+                    // 碱性基团：BH+ ⇌ H+ + B
+                    // 离子化分数 = 10^(pKa-pH) / (1 + 10^(pKa-pH))
+                    const ratio = Math.pow(10, pKa - pH);
+                    ionizationSum += ratio;
+                    netCharge += 1 / (1 + ratio); // 正电荷
+                }
+            });
+            
+            // 标准公式：logD = logP - log10(1 + ionizationSum)
+            const logD = logP - Math.log10(1 + ionizationSum);
+            
+            return { logD, netCharge };
+        }
+        
+        // logD 曲线
+        let logdChart = null;
+        function calcLogD() {
+            const logP = parseFloat(document.getElementById('logd_logp').value);
+            const type = document.getElementById('logd_type').value;
+            const pkaValues = parsePkaValues();
+            
+            if (!logP) { alert('请输入 logP'); return; }
+            if (pkaValues.length === 0) { alert('请输入至少一个 pKa 值'); return; }
+            
+            // 检查 Chart.js 是否加载
+            if (typeof Chart === 'undefined') {
+                alert('图表库加载中，请稍后重试');
+                return;
+            }
+            
+            const ph = [], logd = [], charge = [], recommendation = [];
+            
+            for (let p = 1; p <= 12; p += 0.5) {
+                ph.push(p.toFixed(1));
+                
+                let result;
+                if (pkaValues.length > 1 || type === 'multipka') {
+                    // 多 pKa 计算
+                    result = calcLogDMultiPka(pkaValues, logP, type, p);
+                } else {
+                    // 单 pKa 计算（标准 Henderson-Hasselbalch 方程）
+                    const pKa = pkaValues[0];
+                    let ld, netCharge = 0;
+                    if (type === 'acid') {
+                        // 酸性：logD = logP - log10(1 + 10^(pH-pKa))
+                        const r = Math.pow(10, p - pKa);
+                        ld = logP - Math.log10(1 + r);
+                        netCharge = -r / (1 + r);
+                    } else if (type === 'base') {
+                        // 碱性：logD = logP - log10(1 + 10^(pKa-pH))
+                        const r = Math.pow(10, pKa - p);
+                        ld = logP - Math.log10(1 + r);
+                        netCharge = 1 / (1 + r);
+                    } else {
+                        ld = logP;
+                        netCharge = 0;
+                    }
+                    result = { logD: ld, netCharge };
+                }
+                
+                logd.push(result.logD);
+                charge.push(result.netCharge.toFixed(2));
+                
+                // 推荐条件
+                if (result.logD < 0) recommendation.push('HILIC');
+                else if (result.logD < 1) recommendation.push('C18 低%B');
+                else if (result.logD < 3) recommendation.push('C18 中%B');
+                else recommendation.push('C18 高%B');
+            }
+            
+            const ctx = document.getElementById('logdChart').getContext('2d');
+            if (logdChart) logdChart.destroy();
+            logdChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: ph, datasets: [{ label: 'logD', data: logd, borderColor: '#667eea', fill: true, tension: 0.4 }] },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+            
+            const tbody = document.getElementById('logd_body');
+            tbody.innerHTML = '';
+            for (let i = 0; i < ph.length; i++) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${ph[i]}</td><td>${logd[i].toFixed(2)}</td><td>${charge[i]}</td><td>${recommendation[i]}</td>`;
+                tbody.appendChild(row);
+            }
+        }
+        
+        function updExp() {
+            const n = parseInt(document.getElementById('exp_count').value);
+            const tbody = document.getElementById('exp_body');
+            tbody.innerHTML = '';
+            for (let i = 0; i < n; i++) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>实验${i+1}</td><td><input type="number" class="exp-b" value="${30+i*10}"></td><td><input type="number" class="exp-t1" step="0.1"></td><td><input type="number" class="exp-t2" step="0.1"></td>`;
+                tbody.appendChild(row);
+            }
+        }
+        
+        function calcSep() {
+            const n = parseInt(document.getElementById('exp_count').value);
+            const t0 = parseFloat(document.getElementById('exp_t0').value);
+            const exps = [];
+            for (let i = 0; i < n; i++) {
+                const B = parseFloat(document.querySelectorAll('.exp-b')[i].value) / 100;
+                const t1 = parseFloat(document.querySelectorAll('.exp-t1')[i].value);
+                const t2 = parseFloat(document.querySelectorAll('.exp-t2')[i].value);
+                if (t1 && t2) exps.push({B, t1, t2});
+            }
+            if (exps.length < 2) { alert('至少 2 个实验'); return; }
+            const avgB = exps.reduce((s,e) => s + e.B, 0) / exps.length;
+            const optB = Math.round(avgB * 100);
+            document.getElementById('opt_b').textContent = optB + '%';
+            document.getElementById('opt_rs').textContent = '1.5+';
+            document.getElementById('opt_time').textContent = '15 min';
+            document.getElementById('opt_result').classList.remove('hidden');
+        }
+        
+        // 等待 DOM 就绪后初始化
+        window.addEventListener('load', function() {
+            console.log('=== window.load 事件触发 ===');
+            setTimeout(function() {
+                console.log('开始初始化...');
+                if (typeof initCanvas === 'function') {
+                    initCanvas();
+                } else {
+                    console.error('❌ initCanvas 不存在');
+                }
+            }, 100);
+        });
+    </script>
+</body>
+</html>
